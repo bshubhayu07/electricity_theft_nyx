@@ -1,3 +1,10 @@
+---
+title: Electricity Theft & Anomaly Detection System
+sdk: docker
+app_port: 8501
+pinned: false
+---
+
 # Electricity Theft & Anomaly Detection System
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
