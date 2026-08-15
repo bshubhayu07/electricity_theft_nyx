@@ -1,7 +1,7 @@
 ---
 title: Electricity Theft & Anomaly Detection System
-sdk: docker
-app_port: 8501
+sdk: streamlit
+app_file: dashboard.py
 pinned: false
 ---
 

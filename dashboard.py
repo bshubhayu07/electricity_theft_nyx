@@ -8,6 +8,7 @@ Then run:
 """
 
 import os
+from pathlib import Path
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
@@ -24,15 +25,73 @@ DEFAULT_API_URL = "http://127.0.0.1:8000"
 API_BASE_URL = os.getenv("THEFT_API_URL", DEFAULT_API_URL).rstrip("/")
 
 
+def run_scan_local_fallback(top_n: int, threshold: float = 0.5) -> dict:
+    """Local fallback execution when backend API server is unreachable."""
+    try:
+        from src.models import TheftDetectionEnsemble
+        from src.explain import ShapExplainer
+        from src.features import build_feature_table
+        from src.generate_data import generate
+    except ImportError:
+        raise RuntimeError("Local ML fallback dependencies missing.")
+
+    data_path = Path("data/smart_meter_readings.csv")
+    model_path = Path("models/theft_ensemble.joblib")
+    feature_table_path = Path("models/feature_table.csv")
+
+    if not model_path.exists() or not feature_table_path.exists():
+        if not data_path.exists():
+            os.makedirs("data", exist_ok=True)
+            generate(out_path=str(data_path))
+        df_readings = pd.read_csv(data_path, parse_dates=["date"])
+        feat_df = build_feature_table(df_readings)
+        ensemble = TheftDetectionEnsemble()
+        ensemble.fit(feat_df, feat_df["label"])
+        os.makedirs("models", exist_ok=True)
+        ensemble.save(str(model_path))
+        feat_df.to_csv(feature_table_path, index=False)
+    else:
+        ensemble = TheftDetectionEnsemble.load(str(model_path))
+        feat_df = pd.read_csv(feature_table_path)
+
+    explainer = ShapExplainer(ensemble)
+    scored = ensemble.score(feat_df).sort_values("risk_score", ascending=False)
+    top = scored.head(top_n)
+
+    top_feats = feat_df.set_index("consumer_id").loc[top["consumer_id"]].reset_index()
+    reasons = explainer.top_reasons(top_feats, k=3)
+
+    results = []
+    for (_, row), reason in zip(top.iterrows(), reasons):
+        results.append({
+            "consumer_id": row["consumer_id"],
+            "transformer_id": row["transformer_id"],
+            "risk_score": round(float(row["risk_score"]), 4),
+            "supervised_prob": round(float(row["supervised_prob"]), 4),
+            "anomaly_score": round(float(row["anomaly_score"]), 4),
+            "reasons": reason,
+        })
+
+    return {
+        "total_consumers": len(scored),
+        "flagged_count": int((scored["risk_score"] >= threshold).sum()),
+        "threshold": threshold,
+        "results": results,
+    }
+
+
 def run_scan(top_n: int) -> dict:
-    """Fetch the latest ranked detection results from the FastAPI service."""
-    response = requests.post(
-        f"{API_BASE_URL}/scan",
-        params={"top_n": top_n},
-        timeout=30,
-    )
-    response.raise_for_status()
-    return response.json()
+    """Fetch ranked detection results from FastAPI or fallback to local ML engine."""
+    try:
+        response = requests.post(
+            f"{API_BASE_URL}/scan",
+            params={"top_n": top_n},
+            timeout=5,
+        )
+        response.raise_for_status()
+        return response.json()
+    except Exception:
+        return run_scan_local_fallback(top_n)
 
 
 def as_percent(value: float) -> str:
@@ -70,16 +129,7 @@ if scan_clicked or "scan_data" not in st.session_state:
         with st.spinner("Analyzing consumption patterns..."):
             st.session_state.scan_data = run_scan(top_n)
             st.session_state.scan_top_n = top_n
-    except requests.exceptions.ConnectionError:
-        st.error(
-            f"Could not connect to the API server at {API_BASE_URL}. "
-            "Ensure the FastAPI service is running."
-        )
-    except requests.exceptions.Timeout:
-        st.error("The scan request timed out after 30 seconds.")
-    except requests.exceptions.HTTPError as exc:
-        st.error(f"API Error {exc.response.status_code}: {exc.response.text}")
-    except requests.exceptions.RequestException as exc:
+    except Exception as exc:
         st.error(f"Scan failed: {exc}")
 
 data = st.session_state.get("scan_data")
