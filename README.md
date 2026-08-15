@@ -1,82 +1,117 @@
-# Electricity Theft Detection
+# ⚡ Electricity Theft & Anomaly Detection System
 
-Flags suspicious consumer accounts from smart-meter consumption data.
-Python-only backend: FastAPI serving a two-signal ML ensemble
-(XGBoost + Isolation Forest) with SHAP-based explanations for every flag.
+[![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688.svg)](https://fastapi.tiangolo.com/)
+[![Streamlit](https://img.shields.io/badge/Streamlit-1.40-FF4B4B.svg)](https://streamlit.io/)
+[![Docker](https://img.shields.io/badge/Docker-Supported-2496ED.svg)](https://www.docker.com/)
 
-## Why this approach (not just "train XGBoost on labels")
+An end-to-end decision support platform for power utility managers to flag suspicious smart-meter accounts, catch non-technical losses (NTL), and provide plain-English SHAP audit justifications for field inspection crews.
 
-Most tutorials train one classifier on confirmed theft labels and stop there.
-Two problems with that in the real world:
+---
 
-1. **Confirmed-theft labels are sparse and biased** — they only cover the
-   patterns inspectors already knew to look for. A purely supervised model
-   inherits that blind spot.
-2. **Utilities need reasons, not just scores** — flagging an account for a
-   manual inspection without justification wastes inspector time and erodes
-   trust in the system.
+## 📌 Why This Approach?
 
-So this pipeline combines:
+Standard tutorials train one classifier on confirmed theft labels and stop there. That fails in the real world for two reasons:
+1. **Historical Theft Labels are Sparse & Biased:** Standard supervised models only learn what inspectors caught in the past, making them completely blind to novel ("zero-day") meter bypass tricks.
+2. **Utilities Need Reasons, Not Black-Box Scores:** Field inspection crews are expensive to dispatch. Unexplained risk scores erode inspector trust and lead to wasted operational budgets.
 
-| Signal | Model | Catches |
+### Dual-Signal Engine & XAI Architecture
+
+| Signal | Engine / Model | What It Catches |
 |---|---|---|
-| Supervised | XGBoost (class-weighted) | Patterns similar to past confirmed theft |
-| Unsupervised | Isolation Forest | Novel/"zero-day" tampering with no historical match |
-| Explainability | SHAP (TreeExplainer) | Human-readable reasons per flagged account |
-| Peer comparison | Transformer-group z-score/correlation | Divergence from neighbors on the same feeder, controlling for weather/season |
+| **Supervised** | XGBoost (Class-Weighted) | Patterns matching past confirmed theft cases |
+| **Unsupervised** | Isolation Forest | Novel ("zero-day") statistical anomalies with no past labels |
+| **Explainability** | SHAP (TreeExplainer) | Human-readable audit reasons per flagged account |
+| **Peer Comparison** | Transformer Z-Score & Correlation | Usage divergence from immediate neighbors on the same feeder (filters out cold weather) |
 
-Final `risk_score = 0.65 * supervised_prob + 0.35 * anomaly_score`, both
-components reported separately — an account with high anomaly score but low
-supervised probability is "unusual pattern, no historical match, needs human
-review" rather than a confident theft call.
+$$\text{Composite Risk Score} = 0.65 \times P_{\text{supervised}} + 0.35 \times \text{Score}_{\text{anomaly}}$$
 
-## Architecture
+Both risk components are reported separately so that an account with a high anomaly score but low supervised probability is triaged as *"Needs Human Review"* rather than making a false theft accusation.
 
-```
-data/smart_meter_readings.csv   (long format: consumer_id, transformer_id, date, consumption_kwh, [label])
-        │
-        ▼
-src/features.py     → one feature row per consumer (15 features, see below)
-        │
-        ▼
-src/models.py        → TheftDetectionEnsemble (XGBoost + IsolationForest)
-        │
-        ▼
-src/explain.py       → SHAP reasons per account
-        │
-        ▼
-src/api.py (FastAPI) → POST /scan   (batch, ranks whole population)
-                        POST /score  (single consumer, ad-hoc raw series)
-```
+---
 
-## Features engineered (per consumer)
+## 🐳 Running with Docker (Recommended)
 
-- **Distributional**: mean, std, coefficient of variation, skew, kurtosis
-- **Trend & drops**: normalized trend slope, largest single-day drop %, count of sudden drops
-- **Zero/near-zero**: share of zero-consumption days, longest zero streak (classic meter-bypass signature)
-- **Periodicity**: weekly autocorrelation, weekday/weekend ratio (theft often flattens or disrupts normal weekly rhythm)
-- **Peer comparison**: z-score and correlation vs. the daily mean of consumers on the same transformer (theft shows up as *divergence from neighbors*, not just low usage — a neighbor's usage also dropping means it's probably just cold weather, not theft)
-- **Data quality**: missing-reading ratio (tampering sometimes causes meter communication gaps)
-
-## Quickstart
+The easiest way to launch the full-stack system (FastAPI Backend + Streamlit Dashboard) is using Docker Compose:
 
 ```bash
+# 1. Clone the repository
+git clone https://github.com/bshubhayu07/electricity_theft_nyx.git
+cd electricity_theft_nyx
+
+# 2. Build and start containers
+docker-compose up --build
+```
+
+### Access Ports:
+* **Interactive Dashboard (UI):** [http://localhost:8501](http://localhost:8501)
+* **FastAPI Backend (Swagger API Docs):** [http://localhost:8000/docs](http://localhost:8000/docs)
+* **API Health Check:** [http://localhost:8000/health](http://localhost:8000/health)
+
+*(To stop the containers, press `Ctrl + C` or run `docker-compose down`)*
+
+---
+
+## 💻 Running Locally (Without Docker)
+
+### 1. Prerequisites & Virtual Environment
+```bash
+# Create virtual environment
+python -m venv .venv
+
+# Activate environment (Windows PowerShell)
+.\.venv\Scripts\Activate.ps1
+
+# Install requirements
 pip install -r requirements.txt
+```
 
-# 1. Train (auto-generates a synthetic dataset the first time you run it)
+### 2. Train Model Engine
+Generates synthetic data (if missing in `data/`), engineers 15 domain features, trains the dual-signal ensemble, and saves artifacts to `models/`:
+```bash
 python -m src.train
+```
 
-# 2. Serve
+### 3. Start Backend API
+```bash
 python -m uvicorn src.api:app --reload --port 8000
 ```
 
-Then:
-
+### 4. Start Operator Dashboard (In a New Terminal)
 ```bash
-# Ranked list of most suspicious accounts
-curl -X POST "http://127.0.0.1:8000/scan?top_n=10"
+streamlit run dashboard.py
+```
+Open [http://localhost:8501](http://localhost:8501) in your browser.
 
-# Score one consumer from raw readings (no stored data needed)
+---
+
+## 📊 Dashboard Visual Analytics (3 Navigation Tabs)
+
+The Streamlit interface provides an interactive, emoji-free, professional visual analytics environment:
+
+1. **Tab 1: Threat Queue & Transformer Feeder Breakdown:**
+   * Interactive high-risk suspect dataframe.
+   * Transformer feeder suspect count bar chart.
+2. **Tab 2: Dual-Signal Risk Analytics & Scatter:**
+   * **Supervised vs. Anomaly Scatter Quadrant Plot:** Compares XGBoost probability vs. Isolation Forest anomaly score with threshold quadrant lines.
+   * **Population Risk Histogram:** Visual distribution of composite risk scores across the grid.
+3. **Tab 3: Account Audit Inspector:**
+   * **Individual Risk Component Bar Chart:** Side-by-side comparison of Supervised Prob, Anomaly Score, and Risk Score for any selected account.
+   * **Automated SHAP Audit Reasons:** Highlights top drivers (e.g., *"14-day zero streak [+0.38]"*, *"Transformer z-score divergence +2.8 [+0.25]"*).
+
+---
+
+## 🔌 API Endpoints
+
+### `POST /scan`
+Scans and ranks the grid population by risk score.
+```bash
+curl -X POST "http://127.0.0.1:8000/scan?top_n=10"
+```
+
+### `POST /score`
+Ad-hoc scoring of raw consumption daily series.
+```bash
 curl -X POST http://127.0.0.1:8000/score -H "Content-Type: application/json" -d '{
   "consumer_id": "C_ADHOC_1",
   "dates": ["2024-01-01", "2024-01-02", "...at least 14 days..."],
@@ -84,54 +119,48 @@ curl -X POST http://127.0.0.1:8000/score -H "Content-Type: application/json" -d 
 }'
 ```
 
-## Dashboard
+---
 
-With the API running, start the Streamlit dashboard from the project root:
+## 📁 Project Structure
 
-```bash
-streamlit run dashboard.py
+```
+electricity_theft_nyx/
+├── src/
+│   ├── api.py               # FastAPI backend application & routes
+│   ├── explain.py           # SHAP TreeExplainer & audit reason rules
+│   ├── features.py          # 15 domain-engineered time-series features
+│   ├── generate_data.py     # Synthetic smart-meter data generator
+│   ├── models.py            # TheftDetectionEnsemble (XGBoost + Isolation Forest)
+│   ├── schemas.py           # Pydantic request/response schemas
+│   └── train.py             # End-to-end training & evaluation pipeline
+├── dashboard.py             # Streamlit visual analytics frontend
+├── Dockerfile               # Multi-stage Python 3.11 container setup
+├── docker-compose.yml       # Orchestration for Backend (8000) & Frontend (8501)
+├── generate_final_submission_deck.py # 12-slide PowerPoint presentation generator
+├── requirements.txt         # Project dependencies
+└── README.md                # Project documentation
 ```
 
-The dashboard calls `http://127.0.0.1:8000/scan?top_n=...` by default. To use
-a remote API, set `THEFT_API_URL` to the API base URL before starting Streamlit.
+---
 
-## Using real data instead of the synthetic generator
+## 📊 Public Benchmark Datasets
 
-Point `DATA_PATH` in `src/train.py` at your own CSV with the same long-format
-columns (`consumer_id, transformer_id, date, consumption_kwh, label`).
-`label` (1 = confirmed theft, 0 = normal) is only needed for training the
-supervised half — the Isolation Forest half works unsupervised, so you can
-still get anomaly scores even for consumers with no confirmed history.
+* **SGCC (State Grid Corporation of China):** Standard IEEE TII benchmark containing 42,372 consumers (3,615 theft cases). Reshape using `pandas.melt` and feed directly into `build_feature_table`.
+* **PRECON:** Pakistan Residential Electricity Consumption dataset.
+* **Irish CER:** High-frequency 30-minute interval smart-meter dataset.
 
-**Recommended public benchmark**: the **SGCC (State Grid Corporation of
-China)** dataset — the standard benchmark in the theft-detection literature.
-<cite index="1-1">It contains 42,372 consumer records, with 3,615 flagged as abnormal (theft) and 38,757 normal.</cite>
-It's mirrored on Kaggle (search "SGCC electricity theft detection") and via
-the original GitHub release from the Zheng et al. 2018 IEEE TII paper *"Wide
-and Deep Convolutional Neural Networks for Electricity-Theft Detection."*
-Reshape it to the long format above (`pandas.melt` on the date columns) and
-it drops straight into `build_feature_table`.
+---
 
-Two other datasets worth knowing about if you want to extend this:
-- **PRECON** (Pakistan Residential Electricity Consumption) — used alongside SGCC in several recent ensemble+XAI papers.
-- **Irish CER Smart Metering Project** — higher-frequency (30-min) residential data, good if you want to add time-of-day/tamper-signature features later.
+## ⚠️ Real-World Operational Caveats
 
-## Honest caveats (say these out loud in a hackathon Q&A)
+* **Synthetic vs. Real Noise:** Bundled synthetic data is cleanly separable; real grid data contains significantly more noise and yields lower ROC-AUC.
+* **Feeder Topology Reliance:** Peer comparison assumes accurate transformer mapping. Corrupted topology data affects z-scores.
+* **Decision Support:** Statistical anomalies can be vacant properties—the tool is designed for human-in-the-loop inspection triage, not automatic legal billing penalties.
 
-- The bundled synthetic generator produces *cleanly separable* theft patterns
-  (that's why the demo hits ~1.0 ROC-AUC) — real theft is messier and will
-  score lower. Swap in SGCC or real utility data before quoting accuracy numbers.
-- Peer-group comparison assumes consumers are correctly mapped to a shared
-  transformer/feeder — bad topology data will pollute that feature.
-- Isolation Forest catches *statistical* outliers, not all of which are theft
-  (e.g., a vacant/relocated household). Treat unsupervised-only flags as
-  "needs review," not "confirmed theft."
-- This is a decision-support tool, not a legal determination — final action
-  on any flagged account should go through human inspection.
+---
 
-## Extending further
+## 📜 Presentation Decks Included
 
-- Swap XGBoost for LightGBM/CatBoost if you want faster training on bigger data — same `sklearn`-style API.
-- Add an LSTM/1D-CNN autoencoder on raw daily sequences as a third signal if you have GPU time (catches temporal shape anomalies the hand-crafted features miss).
-- Add SMOTE (`imbalanced-learn`) if your real theft ratio is under ~2% and `scale_pos_weight` alone isn't enough.
-- Persist `/scan` results to SQLite with a timestamp so you can show *trend of risk score over successive scans* for an account — a rising risk score over time is itself a strong signal.
+This repository includes automated script generators and generated presentation decks for hackathon pitches and final project submissions:
+* [`Electricity_Theft_Detection_Final_Submission.pptx`](file:///c:/Users/User/Documents/electricity_theft/Electricity_Theft_Detection_Final_Submission.pptx) (12 Widescreen Slides)
+* [`Electricity_Theft_Detection_Deck.pptx`](file:///c:/Users/User/Documents/electricity_theft/Electricity_Theft_Detection_Deck.pptx) (10 Widescreen Pitch Slides)
