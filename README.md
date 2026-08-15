@@ -7,7 +7,7 @@
 
 An end-to-end decision support platform for power utility managers to flag suspicious smart-meter accounts, catch non-technical losses (NTL), and provide plain-English SHAP audit justifications for field inspection crews.
 
----
+
 
 ## Why This Approach?
 
@@ -18,7 +18,6 @@ Standard tutorials train one classifier on confirmed theft labels and stop there
 ### Dual-Signal Engine & XAI Architecture
 
 | Signal | Engine / Model | What It Catches |
-|---|---|---|
 | **Supervised** | XGBoost (Class-Weighted) | Patterns matching past confirmed theft cases |
 | **Unsupervised** | Isolation Forest | Novel ("zero-day") statistical anomalies with no past labels |
 | **Explainability** | SHAP (TreeExplainer) | Human-readable audit reasons per flagged account |
