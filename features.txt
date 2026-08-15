@@ -1,0 +1,17 @@
+features.py
+*function _autocorr(x,lag)
+x-consumer electricity consumption values[in np.array]
+lag-how days apart do we want to compare
+calculates autocorrelation(how similar is todays usage to usage after a [fixed number of days](lag))
+we calculate correlation between electricity consumption values of 7 days apart.
+* function _max_zero_streak(x) 
+x-consumer electricity consumption values[in np.array]
+finding longest consecutive run of zero consumption
+* main function featurize_consumer(series,peer_mean_series)
+series-contains the electricity consumption history of one consumer.
+peer_main_series - average daily consumption of all consumers connected to the same transformer.
+returns important deduced information user's electricity consumption.
+* function build_feature_table(df)
+df - complete dataset containing all consumers' daily electricity consumption.
+processes the entire dataset.
+***label in the dataset is the target variable (the answer the machine learning model is trying to predict) 0 for normal consumer, 1 for detected theft consumers***

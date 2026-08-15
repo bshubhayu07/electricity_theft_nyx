@@ -1,0 +1,29 @@
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.pytest_cache/
+.coverage
+
+# Data & Models generated at runtime (optional)
+data/*.csv
+!data/.gitkeep
+models/*.joblib
+models/*.csv
+
+# Operating System & IDEs
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Docker build logs
+*.log
