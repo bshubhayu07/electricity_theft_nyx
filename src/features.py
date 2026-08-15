@@ -60,8 +60,13 @@ def featurize_consumer(series: pd.DataFrame, peer_mean_series: np.ndarray | None
     cv = std / mean if mean > 1e-6 else 0.0
 
     # trend: slope of linear fit over time, normalized by mean level
-    t = np.arange(n)
-    slope = float(np.polyfit(t, x, 1)[0]) / (mean + 1e-6)
+    if n > 1:
+        t_centered = np.arange(n) - (n - 1) / 2.0
+        denom = np.sum(t_centered ** 2)
+        slope_raw = np.sum(t_centered * (x - mean)) / denom if denom > 0 else 0.0
+    else:
+        slope_raw = 0.0
+    slope = float(slope_raw) / (mean + 1e-6)
 
     day_over_day = np.diff(x)
     max_drop_pct = float(np.min(day_over_day) / (mean + 1e-6)) if n > 1 else 0.0
@@ -92,8 +97,8 @@ def featurize_consumer(series: pd.DataFrame, peer_mean_series: np.ndarray | None
         "mean_kwh": mean,
         "std_kwh": std,
         "cv_kwh": cv,
-        "skew_kwh": float(skew(x)) if n > 2 else 0.0,
-        "kurtosis_kwh": float(kurtosis(x)) if n > 2 else 0.0,
+        "skew_kwh": float(np.nan_to_num(skew(x))) if (n > 2 and std > 1e-6) else 0.0,
+        "kurtosis_kwh": float(np.nan_to_num(kurtosis(x))) if (n > 2 and std > 1e-6) else 0.0,
         "trend_slope": slope,
         "max_drop_pct": max_drop_pct,
         "n_sudden_drops": n_sudden_drops,
