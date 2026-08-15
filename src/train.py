@@ -32,7 +32,7 @@ def main():
         generate(out_path=DATA_PATH)
 
     print("Loading readings...")
-    df = pd.read_csv(DATA_PATH, parse_dates=["date"])
+    df = pd.read_csv(DATA_PATH, parse_dates=["date"], on_bad_lines="skip")
 
     print("Engineering features (one row per consumer)...")
     feat_df = build_feature_table(df)

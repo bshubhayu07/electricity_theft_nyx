@@ -51,7 +51,7 @@ def load_artifacts():
     _state["explainer"] = ShapExplainer(_state["ensemble"])
 
     if FEATURE_TABLE_PATH.exists():
-        _state["feature_table"] = pd.read_csv(FEATURE_TABLE_PATH)
+        _state["feature_table"] = pd.read_csv(FEATURE_TABLE_PATH, on_bad_lines="skip")
     else:
         _state["feature_table"] = None
 

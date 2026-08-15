@@ -43,7 +43,7 @@ def run_scan_local_fallback(top_n: int, threshold: float = 0.5) -> dict:
         if not data_path.exists():
             os.makedirs("data", exist_ok=True)
             generate(out_path=str(data_path))
-        df_readings = pd.read_csv(data_path, parse_dates=["date"])
+        df_readings = pd.read_csv(data_path, parse_dates=["date"], on_bad_lines="skip")
         feat_df = build_feature_table(df_readings)
         ensemble = TheftDetectionEnsemble()
         ensemble.fit(feat_df, feat_df["label"])
@@ -52,7 +52,7 @@ def run_scan_local_fallback(top_n: int, threshold: float = 0.5) -> dict:
         feat_df.to_csv(feature_table_path, index=False)
     else:
         ensemble = TheftDetectionEnsemble.load(str(model_path))
-        feat_df = pd.read_csv(feature_table_path)
+        feat_df = pd.read_csv(feature_table_path, on_bad_lines="skip")
 
     explainer = ShapExplainer(ensemble)
     scored = ensemble.score(feat_df).sort_values("risk_score", ascending=False)
