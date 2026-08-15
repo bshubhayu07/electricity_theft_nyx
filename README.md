@@ -1,4 +1,4 @@
-# ⚡ Electricity Theft & Anomaly Detection System
+# Electricity Theft & Anomaly Detection System
 
 [![Python](https://img.shields.io/badge/Python-3.11-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.110-009688.svg)](https://fastapi.tiangolo.com/)
@@ -9,7 +9,7 @@ An end-to-end decision support platform for power utility managers to flag suspi
 
 ---
 
-## 📌 Why This Approach?
+## Why This Approach?
 
 Standard tutorials train one classifier on confirmed theft labels and stop there. That fails in the real world for two reasons:
 1. **Historical Theft Labels are Sparse & Biased:** Standard supervised models only learn what inspectors caught in the past, making them completely blind to novel ("zero-day") meter bypass tricks.
@@ -30,7 +30,7 @@ Both risk components are reported separately so that an account with a high anom
 
 ---
 
-## 🐳 Running with Docker (Recommended)
+## Running with Docker (Recommended)
 
 The easiest way to launch the full-stack system (FastAPI Backend + Streamlit Dashboard) is using Docker Compose:
 
@@ -52,7 +52,7 @@ docker-compose up --build
 
 ---
 
-## 💻 Running Locally (Without Docker)
+## Running Locally (Without Docker)
 
 ### 1. Prerequisites & Virtual Environment
 ```bash
@@ -85,9 +85,9 @@ Open [http://localhost:8501](http://localhost:8501) in your browser.
 
 ---
 
-## 📊 Dashboard Visual Analytics (3 Navigation Tabs)
+## Dashboard Visual Analytics (3 Navigation Tabs)
 
-The Streamlit interface provides an interactive, emoji-free, professional visual analytics environment:
+The Streamlit interface provides an interactive, professional visual analytics environment:
 
 1. **Tab 1: Threat Queue & Transformer Feeder Breakdown:**
    * Interactive high-risk suspect dataframe.
@@ -101,7 +101,7 @@ The Streamlit interface provides an interactive, emoji-free, professional visual
 
 ---
 
-## 🔌 API Endpoints
+## API Endpoints
 
 ### `POST /scan`
 Scans and ranks the grid population by risk score.
@@ -121,7 +121,7 @@ curl -X POST http://127.0.0.1:8000/score -H "Content-Type: application/json" -d 
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 electricity_theft_nyx/
@@ -143,7 +143,7 @@ electricity_theft_nyx/
 
 ---
 
-## 📊 Public Benchmark Datasets
+## Public Benchmark Datasets
 
 * **SGCC (State Grid Corporation of China):** Standard IEEE TII benchmark containing 42,372 consumers (3,615 theft cases). Reshape using `pandas.melt` and feed directly into `build_feature_table`.
 * **PRECON:** Pakistan Residential Electricity Consumption dataset.
@@ -151,7 +151,7 @@ electricity_theft_nyx/
 
 ---
 
-## ⚠️ Real-World Operational Caveats
+## Real-World Operational Caveats
 
 * **Synthetic vs. Real Noise:** Bundled synthetic data is cleanly separable; real grid data contains significantly more noise and yields lower ROC-AUC.
 * **Feeder Topology Reliance:** Peer comparison assumes accurate transformer mapping. Corrupted topology data affects z-scores.
@@ -159,7 +159,7 @@ electricity_theft_nyx/
 
 ---
 
-## 📜 Presentation Decks Included
+## Presentation Decks Included
 
 This repository includes automated script generators and generated presentation decks for hackathon pitches and final project submissions:
 * [`Electricity_Theft_Detection_Final_Submission.pptx`](file:///c:/Users/User/Documents/electricity_theft/Electricity_Theft_Detection_Final_Submission.pptx) (12 Widescreen Slides)
