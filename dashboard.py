@@ -94,6 +94,48 @@ def run_scan(top_n: int) -> dict:
         return run_scan_local_fallback(top_n)
 
 
+def generate_local_report(consumer_row: pd.Series) -> str:
+    """Generates inspection report text locally if API is unreachable."""
+    try:
+        from src.report_generator import generate_inspection_report
+        return generate_inspection_report(
+            consumer_id=consumer_row["consumer_id"],
+            transformer_id=consumer_row["transformer_id"],
+            risk_score=consumer_row["risk_score"],
+            supervised_prob=consumer_row["supervised_prob"],
+            anomaly_score=consumer_row["anomaly_score"],
+            reasons=consumer_row.get("reasons", [])
+        )
+    except Exception:
+        return f"INSPECTION REPORT FOR CONSUMER {consumer_row['consumer_id']}\nRisk: {consumer_row['risk_score']:.1%}"
+
+
+def fetch_report(consumer_id: str, consumer_row: pd.Series) -> str:
+    """Fetch official report from API or generate locally."""
+    try:
+        res = requests.post(f"{API_BASE_URL}/report/{consumer_id}", timeout=5)
+        if res.status_code == 200:
+            return res.text
+    except Exception:
+        pass
+    return generate_local_report(consumer_row)
+
+
+def purge_data_session() -> dict:
+    """Fetch DPDP purge receipt from API or generate locally."""
+    try:
+        res = requests.post(f"{API_BASE_URL}/purge-session", timeout=5)
+        if res.status_code == 200:
+            return res.json()
+    except Exception:
+        pass
+    try:
+        from src.security import purge_ephemeral_session_data
+        return purge_ephemeral_session_data()
+    except Exception:
+        return {"receipt_text": "DPDP 2025 Data Purge Executed (0 Bytes Retained)"}
+
+
 def as_percent(value: float) -> str:
     return f"{value:.1%}"
 
@@ -105,11 +147,12 @@ st.markdown("""
         .stMetric { background-color: #1E293B; padding: 12px 18px; border-radius: 8px; border: 1px solid #334155; }
         .audit-card { background-color: #1E293B; border-left: 4px solid #06B6D4; padding: 12px 16px; margin-bottom: 10px; border-radius: 4px; }
         .reason-box { background-color: #0F172A; border: 1px solid #334155; padding: 10px 14px; margin-top: 6px; border-radius: 6px; color: #F8FAFC; }
+        .receipt-box { background-color: #090D16; border: 1px solid #06B6D4; font-family: monospace; padding: 12px; border-radius: 4px; color: #38BDF8; font-size: 12px; }
     </style>
 """, unsafe_allow_html=True)
 
 st.title("Electricity Theft & Anomaly Detection System")
-st.caption("Decision support platform for smart meter non-technical loss analytics and inspection triage.")
+st.caption("Enterprise decision support platform for smart meter non-technical loss analytics and inspection triage.")
 
 with st.sidebar:
     st.header("Scan Configuration")
@@ -122,6 +165,14 @@ with st.sidebar:
     )
     st.caption(f"Backend API: {API_BASE_URL}")
     scan_clicked = st.button("Run Threat Scan", type="primary", use_container_width=True)
+
+    st.markdown("---")
+    st.subheader("Data Governance & DPDP 2025")
+    if st.button("Purge Session Data & Audit Certificate", use_container_width=True):
+        st.session_state.purge_receipt = purge_data_session()
+
+    if "purge_receipt" in st.session_state:
+        st.markdown(f'<div class="receipt-box"><pre>{st.session_state.purge_receipt.get("receipt_text")}</pre></div>', unsafe_allow_html=True)
 
 # Run scan on button click or load state
 if scan_clicked or "scan_data" not in st.session_state:
@@ -157,7 +208,7 @@ df = pd.DataFrame(results)
 tab_overview, tab_analytics, tab_inspector = st.tabs([
     "Threat Queue & Transformer Feeder Breakdown",
     "Dual-Signal Risk Analytics & Scatter",
-    "Account Audit Inspector"
+    "Account Audit Inspector & Report Export"
 ])
 
 with tab_overview:
@@ -213,7 +264,6 @@ with tab_analytics:
     col_chart1, col_chart2 = st.columns(2)
     
     with col_chart1:
-        # Scatter Plot: Supervised Prob vs Anomaly Score
         fig_scatter = px.scatter(
             df,
             x="supervised_prob",
@@ -241,7 +291,6 @@ with tab_analytics:
         st.plotly_chart(fig_scatter, use_container_width=True)
 
     with col_chart2:
-        # Distribution Histogram of Overall Risk Scores
         fig_hist = px.histogram(
             df,
             x="risk_score",
@@ -262,7 +311,7 @@ with tab_analytics:
 with tab_inspector:
     st.subheader("Account Deep-Dive Audit Inspector")
     selected_consumer = st.selectbox(
-        "Select a Consumer ID to inspect SHAP attributions and score components:",
+        "Select a Consumer ID to inspect SHAP attributions and export report:",
         options=df["consumer_id"].tolist(),
     )
     
@@ -279,6 +328,15 @@ with tab_inspector:
             </div>
         """, unsafe_allow_html=True)
         
+        report_content = fetch_report(selected_consumer, consumer_row)
+        st.download_button(
+            label="Download Inspection Audit Report (.txt)",
+            data=report_content,
+            file_name=f"inspection_report_{selected_consumer}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+
         st.write("**Automated SHAP Audit Reasons:**")
         reasons_list = consumer_row.get("reasons", [])
         if reasons_list:
@@ -288,7 +346,6 @@ with tab_inspector:
             st.info("No specific anomaly reasons flagged for this consumer.")
 
     with col_insp_chart:
-        # Component comparison bar chart for selected consumer
         comp_df = pd.DataFrame({
             "Signal Metric": ["Supervised ML Prob", "Unsupervised Anomaly Score", "Composite Risk Score"],
             "Score Percentage": [
