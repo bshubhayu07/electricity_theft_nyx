@@ -17,8 +17,6 @@ An end-to-end decision support platform for power utility managers to flag suspi
 ## Live Web Application
 
 * **GitHub Pages Live Site:** [https://bshubhayu07.github.io/electricity_theft_nyx/](https://bshubhayu07.github.io/electricity_theft_nyx/)
-* **Streamlit Cloud App:** [https://electricity-theft-nyx.streamlit.app](https://electricity-theft-nyx.streamlit.app)
-* **Source Repository:** [https://github.com/bshubhayu07/electricity_theft_nyx](https://github.com/bshubhayu07/electricity_theft_nyx)
 
 
 
