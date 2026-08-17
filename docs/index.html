@@ -193,12 +193,17 @@
 
       Plotly.newPlot("chart-transformer", [{
         x: x, y: y, type: "bar",
-        marker: { color: y, colorscale: "Reds" }
+        marker: { color: y, colorscale: "Plasma", line: { color: "#06B6D4", width: 1.5 } },
+        text: y,
+        textposition: "outside",
+        hovertemplate: "<b>Transformer Zone %{x}</b><br>Suspect Accounts: %{y}<extra></extra>"
       }], {
-        margin: { l: 30, r: 10, t: 10, b: 30 },
+        margin: { l: 30, r: 10, t: 20, b: 30 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
-        font: { color: "#94A3B8" }
+        font: { color: "#94A3B8" },
+        xaxis: { gridcolor: "#334155" },
+        yaxis: { gridcolor: "#334155" }
       }, { responsive: true, displayModeBar: false });
     }
 
@@ -208,21 +213,29 @@
         y: sampleData.map(d => d.anomaly_score),
         mode: "markers",
         marker: {
-          size: sampleData.map(d => d.risk_score * 20 + 8),
+          size: sampleData.map(d => d.risk_score * 24 + 10),
           color: sampleData.map(d => d.risk_score),
-          colorscale: "Viridis"
+          colorscale: "Turbo",
+          line: { color: "#F8FAFC", width: 1 }
         },
-        text: sampleData.map(d => `${d.consumer_id} (${d.transformer_id})`)
+        customdata: sampleData.map(d => [d.consumer_id, d.transformer_id, d.risk_score]),
+        hovertemplate: "<b>Consumer %{customdata[0]}</b><br>Transformer: %{customdata[1]}<br>Composite Risk: %{customdata[2]:.1%}<br>Supervised Prob: %{x:.1%}<br>Anomaly Score: %{y:.1%}<extra></extra>"
       }], {
-        margin: { l: 40, r: 10, t: 10, b: 40 },
+        margin: { l: 40, r: 10, t: 20, b: 40 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
-        xaxis: { title: "Supervised ML Prob", gridcolor: "#334155" },
-        yaxis: { title: "Anomaly Score", gridcolor: "#334155" },
+        xaxis: { title: "Supervised ML Prob", gridcolor: "#334155", tickformat: ".0%" },
+        yaxis: { title: "Anomaly Score", gridcolor: "#334155", tickformat: ".0%" },
         font: { color: "#94A3B8" },
         shapes: [
           { type: 'line', x0: 0.5, y0: 0, x1: 0.5, y1: 1, line: { color: '#64748B', dash: 'dash' } },
           { type: 'line', x0: 0, y0: 0.5, x1: 1, y1: 0.5, line: { color: '#64748B', dash: 'dash' } }
+        ],
+        annotations: [
+          { x: 0.85, y: 0.95, text: "High Theft Signature", showarrow: false, font: { color: "#EF4444", size: 11 } },
+          { x: 0.15, y: 0.95, text: "Zero-Day Anomaly", showarrow: false, font: { color: "#F59E0B", size: 11 } },
+          { x: 0.85, y: 0.05, text: "Known Pattern", showarrow: false, font: { color: "#3B82F6", size: 11 } },
+          { x: 0.15, y: 0.05, text: "Low Risk Baseline", showarrow: false, font: { color: "#10B981", size: 11 } }
         ]
       }, { responsive: true, displayModeBar: false });
     }
@@ -232,14 +245,18 @@
         x: sampleData.map(d => d.risk_score),
         type: "histogram",
         nbinsx: 10,
-        marker: { color: "#06B6D4" }
+        marker: { color: "#06B6D4", line: { color: "#38BDF8", width: 1.2 } },
+        hovertemplate: "Risk Range: %{x}<br>Consumer Count: %{y}<extra></extra>"
       }], {
-        margin: { l: 40, r: 10, t: 10, b: 40 },
+        margin: { l: 40, r: 10, t: 20, b: 40 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
-        xaxis: { title: "Composite Risk Score", gridcolor: "#334155" },
+        xaxis: { title: "Composite Risk Score", gridcolor: "#334155", tickformat: ".0%" },
         yaxis: { title: "Count", gridcolor: "#334155" },
-        font: { color: "#94A3B8" }
+        font: { color: "#94A3B8" },
+        shapes: [
+          { type: 'line', x0: 0.5, y0: 0, x1: 0.5, y1: 5, line: { color: '#EF4444', dash: 'dash' } }
+        ]
       }, { responsive: true, displayModeBar: false });
     }
 
@@ -264,12 +281,15 @@
         x: ["Supervised ML Prob", "Unsupervised Anomaly Score", "Composite Risk Score"],
         y: [row.supervised_prob, row.anomaly_score, row.risk_score],
         type: "bar",
-        marker: { color: ["#3B82F6", "#10B981", "#F59E0B"] }
+        text: [row.supervised_prob, row.anomaly_score, row.risk_score].map(v => (v * 100).toFixed(1) + "%"),
+        textposition: "outside",
+        marker: { color: ["#3B82F6", "#10B981", "#F59E0B"], line: { color: "#F8FAFC", width: 1.2 } },
+        hovertemplate: "<b>%{x}</b>: %{y:.1%}<extra></extra>"
       }], {
         margin: { l: 40, r: 10, t: 20, b: 40 },
         paper_bgcolor: "rgba(0,0,0,0)",
         plot_bgcolor: "rgba(0,0,0,0)",
-        yaxis: { range: [0, 1.05], tickformat: ".0%", gridcolor: "#334155" },
+        yaxis: { range: [0, 1.15], tickformat: ".0%", gridcolor: "#334155" },
         font: { color: "#94A3B8" }
       }, { responsive: true, displayModeBar: false });
     }

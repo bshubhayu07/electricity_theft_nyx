@@ -144,8 +144,8 @@ def as_percent(value: float) -> str:
 st.markdown("""
     <style>
         .block-container { padding-top: 1.5rem; }
-        .stMetric { background-color: #1E293B; padding: 12px 18px; border-radius: 8px; border: 1px solid #334155; }
-        .audit-card { background-color: #1E293B; border-left: 4px solid #06B6D4; padding: 12px 16px; margin-bottom: 10px; border-radius: 4px; }
+        .stMetric { background-color: #1E293B; padding: 14px 18px; border-radius: 8px; border: 1px solid #334155; }
+        .audit-card { background-color: #1E293B; border-left: 4px solid #06B6D4; padding: 14px 18px; margin-bottom: 12px; border-radius: 6px; }
         .reason-box { background-color: #0F172A; border: 1px solid #334155; padding: 10px 14px; margin-top: 6px; border-radius: 6px; color: #F8FAFC; }
         .receipt-box { background-color: #090D16; border: 1px solid #06B6D4; font-family: monospace; padding: 12px; border-radius: 4px; color: #38BDF8; font-size: 12px; }
     </style>
@@ -212,10 +212,10 @@ tab_overview, tab_analytics, tab_inspector = st.tabs([
 ])
 
 with tab_overview:
-    left_col, right_col = st.columns([1.6, 1.0])
+    left_col, right_col = st.columns([1.5, 1.1])
     
     with left_col:
-        st.subheader("Ranked High-Risk Accounts")
+        st.subheader("Ranked High-Risk Suspect Accounts")
         df_display = df[
             ["consumer_id", "transformer_id", "risk_score", "supervised_prob", "anomaly_score"]
         ].copy()
@@ -237,23 +237,33 @@ with tab_overview:
         )
 
     with right_col:
-        st.subheader("Suspects by Transformer Feeder")
+        st.subheader("Suspects by Transformer Feeder Zone")
         transformer_counts = (
             df["transformer_id"].value_counts().rename_axis("Transformer ID").reset_index(name="Suspect Count")
         )
+        
         fig_trans = px.bar(
             transformer_counts,
             x="Transformer ID",
             y="Suspect Count",
             color="Suspect Count",
-            color_continuous_scale="Reds",
+            color_continuous_scale="Plasma",
+            text="Suspect Count",
             template="plotly_dark",
+        )
+        fig_trans.update_traces(
+            textposition="outside",
+            marker_line_color="#06B6D4",
+            marker_line_width=1.5,
+            hovertemplate="<b>Transformer Zone %{x}</b><br>Suspect Accounts: %{y}<extra></extra>"
         )
         fig_trans.update_layout(
             margin=dict(l=10, r=10, t=20, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
-            coloraxis_showscale=False
+            coloraxis_showscale=False,
+            xaxis=dict(gridcolor="#334155"),
+            yaxis=dict(gridcolor="#334155")
         )
         st.plotly_chart(fig_trans, use_container_width=True)
 
@@ -270,9 +280,9 @@ with tab_analytics:
             y="anomaly_score",
             color="risk_score",
             size="risk_score",
+            color_continuous_scale="Turbo",
+            custom_data=["transformer_id", "risk_score"],
             hover_name="consumer_id",
-            hover_data=["transformer_id", "risk_score"],
-            color_continuous_scale="Viridis",
             labels={
                 "supervised_prob": "Supervised ML Probability (XGBoost)",
                 "anomaly_score": "Unsupervised Anomaly Score (Isolation Forest)",
@@ -281,12 +291,25 @@ with tab_analytics:
             title="Supervised Probability vs. Anomaly Score",
             template="plotly_dark"
         )
+        fig_scatter.update_traces(
+            hovertemplate="<b>Consumer %{hovertext}</b><br>Transformer: %{customdata[0]}<br>Composite Risk: %{customdata[1]:.1%}<br>Supervised Prob: %{x:.1%}<br>Anomaly Score: %{y:.1%}<extra></extra>",
+            marker=dict(line=dict(width=1, color="#F8FAFC"))
+        )
         fig_scatter.add_vline(x=0.5, line_dash="dash", line_color="#94A3B8")
         fig_scatter.add_hline(y=0.5, line_dash="dash", line_color="#94A3B8")
+        
+        # Quadrant Label Annotations
+        fig_scatter.add_annotation(x=0.85, y=0.95, text="High Theft Signature", showarrow=False, font=dict(color="#EF4444", size=11, family="sans-serif"))
+        fig_scatter.add_annotation(x=0.15, y=0.95, text="Zero-Day Anomaly", showarrow=False, font=dict(color="#F59E0B", size=11, family="sans-serif"))
+        fig_scatter.add_annotation(x=0.85, y=0.05, text="Known Pattern", showarrow=False, font=dict(color="#3B82F6", size=11, family="sans-serif"))
+        fig_scatter.add_annotation(x=0.15, y=0.05, text="Low Risk Baseline", showarrow=False, font=dict(color="#10B981", size=11, family="sans-serif"))
+
         fig_scatter.update_layout(
             margin=dict(l=10, r=10, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
-            plot_bgcolor="rgba(0,0,0,0)"
+            plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(range=[-0.05, 1.05], gridcolor="#334155", tickformat=".0%"),
+            yaxis=dict(range=[-0.05, 1.05], gridcolor="#334155", tickformat=".0%")
         )
         st.plotly_chart(fig_scatter, use_container_width=True)
 
@@ -294,16 +317,24 @@ with tab_analytics:
         fig_hist = px.histogram(
             df,
             x="risk_score",
-            nbins=15,
+            nbins=12,
             color_discrete_sequence=["#06B6D4"],
             labels={"risk_score": "Composite Risk Score"},
             title="Population Risk Score Histogram",
             template="plotly_dark"
         )
+        fig_hist.update_traces(
+            marker_line_color="#38BDF8",
+            marker_line_width=1.2,
+            hovertemplate="Risk Range: %{x}<br>Consumer Count: %{y}<extra></extra>"
+        )
+        fig_hist.add_vline(x=0.5, line_dash="dash", line_color="#EF4444", annotation_text="Triage Threshold (50%)", annotation_position="top right")
         fig_hist.update_layout(
             margin=dict(l=10, r=10, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
+            xaxis=dict(gridcolor="#334155", tickformat=".0%"),
+            yaxis=dict(gridcolor="#334155"),
             yaxis_title="Consumer Count"
         )
         st.plotly_chart(fig_hist, use_container_width=True)
@@ -360,6 +391,7 @@ with tab_inspector:
             x="Signal Metric",
             y="Score Percentage",
             color="Signal Metric",
+            text="Score Percentage",
             color_discrete_map={
                 "Supervised ML Prob": "#3B82F6",
                 "Unsupervised Anomaly Score": "#10B981",
@@ -368,11 +400,19 @@ with tab_inspector:
             title=f"Risk Score Component Breakdown for {selected_consumer}",
             template="plotly_dark"
         )
+        fig_comp.update_traces(
+            texttemplate="%{y:.1%}",
+            textposition="outside",
+            marker_line_color="#F8FAFC",
+            marker_line_width=1.2,
+            hovertemplate="<b>%{x}</b>: %{y:.1%}<extra></extra>"
+        )
         fig_comp.update_layout(
             margin=dict(l=10, r=10, t=40, b=10),
             paper_bgcolor="rgba(0,0,0,0)",
             plot_bgcolor="rgba(0,0,0,0)",
             showlegend=False,
-            yaxis=dict(range=[0, 1.05], tickformat=".0%")
+            xaxis=dict(gridcolor="#334155"),
+            yaxis=dict(range=[0, 1.15], tickformat=".0%", gridcolor="#334155")
         )
         st.plotly_chart(fig_comp, use_container_width=True)
