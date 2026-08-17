@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electricity Theft & Anomaly Detection System</title>
+
+  <!-- Tailwind CSS & Plotly JS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <style>
+    body { background-color: #0F172A; color: #F8FAFC; font-family: system-ui, -apple-system, sans-serif; }
+    .glass-card { background-color: #1E293B; border: 1px solid #334155; border-radius: 8px; }
+    .audit-border { border-left: 4px solid #06B6D4; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+  <!-- Header Bar -->
+  <header class="max-w-7xl mx-auto mb-6 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-slate-800 pb-4">
+    <div>
+      <h1 class="text-2xl md:text-3xl font-bold text-cyan-400">Electricity Theft & Anomaly Detection System</h1>
+      <p class="text-slate-400 text-sm mt-1">Enterprise decision support platform for smart meter non-technical loss analytics and inspection triage.</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <span class="px-3 py-1 bg-cyan-950 text-cyan-400 border border-cyan-800 rounded-full text-xs font-semibold">GitHub Pages Production Live</span>
+    </div>
+  </header>
+
+  <!-- KPI Metrics Grid -->
+  <main class="max-w-7xl mx-auto space-y-6">
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="glass-card p-4">
+        <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Consumers Monitored</p>
+        <p class="text-2xl font-bold text-white mt-1" id="metric-total">600</p>
+      </div>
+      <div class="glass-card p-4">
+        <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">High-Risk Suspects</p>
+        <p class="text-2xl font-bold text-red-400 mt-1" id="metric-flagged">51</p>
+        <p class="text-xs text-red-400 mt-1">Requires Field Inspection</p>
+      </div>
+      <div class="glass-card p-4">
+        <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Displayed Suspects</p>
+        <p class="text-2xl font-bold text-emerald-400 mt-1" id="metric-displayed">20</p>
+      </div>
+      <div class="glass-card p-4">
+        <p class="text-xs text-slate-400 font-medium uppercase tracking-wider">Risk Threshold</p>
+        <p class="text-2xl font-bold text-cyan-400 mt-1">50.0%</p>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="border-b border-slate-800 flex gap-4">
+      <button onclick="switchTab('tab-threats')" id="btn-threats" class="pb-3 text-sm font-semibold border-b-2 border-cyan-400 text-cyan-400">Threat Queue & Transformer Feeder</button>
+      <button onclick="switchTab('tab-analytics')" id="btn-analytics" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200">Dual-Signal Risk Analytics</button>
+      <button onclick="switchTab('tab-inspector')" id="btn-inspector" class="pb-3 text-sm font-semibold border-b-2 border-transparent text-slate-400 hover:text-slate-200">Account Audit Inspector</button>
+    </div>
+
+    <!-- Tab 1: Threat Queue -->
+    <div id="tab-threats" class="space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="lg:col-span-2 glass-card p-4">
+          <h2 class="text-lg font-semibold text-slate-200 mb-4">Ranked High-Risk Suspect Accounts</h2>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead class="bg-slate-800/60 text-slate-400 uppercase text-xs">
+                <tr>
+                  <th class="p-3">Consumer ID</th>
+                  <th class="p-3">Transformer Zone</th>
+                  <th class="p-3">Overall Risk</th>
+                  <th class="p-3">Supervised Prob</th>
+                  <th class="p-3">Anomaly Score</th>
+                </tr>
+              </thead>
+              <tbody id="suspects-tbody" class="divide-y divide-slate-800 text-slate-300">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="glass-card p-4">
+          <h2 class="text-lg font-semibold text-slate-200 mb-4">Suspects by Transformer Zone</h2>
+          <div id="chart-transformer" class="w-full h-72"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2: Risk Analytics -->
+    <div id="tab-analytics" class="hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="glass-card p-4">
+          <h2 class="text-lg font-semibold text-slate-200 mb-2">Supervised Probability vs Anomaly Score</h2>
+          <p class="text-xs text-slate-400 mb-4">Quadrant analysis comparing XGBoost Supervised Theft Prob vs Isolation Forest Anomaly Score.</p>
+          <div id="chart-scatter" class="w-full h-80"></div>
+        </div>
+
+        <div class="glass-card p-4">
+          <h2 class="text-lg font-semibold text-slate-200 mb-2">Population Risk Score Histogram</h2>
+          <p class="text-xs text-slate-400 mb-4">Frequency distribution of composite risk scores across monitored population.</p>
+          <div id="chart-histogram" class="w-full h-80"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 3: Account Inspector -->
+    <div id="tab-inspector" class="hidden space-y-6">
+      <div class="glass-card p-4">
+        <label class="block text-sm font-medium text-slate-300 mb-2">Select Consumer ID to inspect attributions and export report:</label>
+        <select id="select-consumer" onchange="onConsumerSelect(this.value)" class="bg-slate-900 border border-slate-700 text-white rounded p-2 text-sm w-full max-w-md">
+          <!-- Populated via JS -->
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div class="glass-card p-4 space-y-4">
+          <div class="audit-card p-4 rounded bg-slate-800/40">
+            <p class="text-sm font-semibold text-cyan-400" id="insp-id">Consumer ID: C100336</p>
+            <p class="text-xs text-slate-400 mt-1">Transformer Zone: <span id="insp-trans" class="text-slate-200 font-medium">T024</span></p>
+            <p class="text-xs text-slate-400">Composite Risk: <span id="insp-risk" class="text-red-400 font-bold">99.8%</span></p>
+          </div>
+
+          <button onclick="downloadReport()" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white py-2 rounded text-sm font-semibold transition">Download Inspection Audit Report (.txt)</button>
+
+          <div>
+            <p class="text-sm font-semibold text-slate-200 mb-2">Automated SHAP Audit Reasons:</p>
+            <div id="insp-reasons" class="space-y-2">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-2 glass-card p-4">
+          <h2 class="text-lg font-semibold text-slate-200 mb-4">Risk Component Breakdown</h2>
+          <div id="chart-component" class="w-full h-80"></div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Data Script -->
+  <script>
+    const sampleData = [
+      { consumer_id: "C100336", transformer_id: "T024", risk_score: 0.998, supervised_prob: 1.00, anomaly_score: 1.00, reasons: ["usage trend over time elevated risk", "relative volatility (CV) elevated risk", "usage skew elevated risk"] },
+      { consumer_id: "C100426", transformer_id: "T021", risk_score: 0.979, supervised_prob: 1.00, anomaly_score: 0.95, reasons: ["usage trend over time elevated risk", "relative volatility (CV) elevated risk", "usage skew elevated risk"] },
+      { consumer_id: "C100334", transformer_id: "T011", risk_score: 0.972, supervised_prob: 1.00, anomaly_score: 0.93, reasons: ["usage trend over time elevated risk", "relative volatility (CV) elevated risk", "usage volatility elevated risk"] },
+      { consumer_id: "C100284", transformer_id: "T007", risk_score: 0.942, supervised_prob: 1.00, anomaly_score: 0.84, reasons: ["usage trend over time elevated risk", "relative volatility (CV) elevated risk", "correlation with neighbors elevated risk"] },
+      { consumer_id: "C100444", transformer_id: "T019", risk_score: 0.930, supervised_prob: 0.99, anomaly_score: 0.82, reasons: ["usage trend over time elevated risk", "relative volatility (CV) elevated risk", "usage skew elevated risk"] },
+      { consumer_id: "C100112", transformer_id: "T004", risk_score: 0.915, supervised_prob: 0.98, anomaly_score: 0.79, reasons: ["zero streak length elevated risk", "weekday weekend ratio disruption", "peer zscore divergence"] },
+      { consumer_id: "C100518", transformer_id: "T013", risk_score: 0.885, supervised_prob: 0.95, anomaly_score: 0.76, reasons: ["sudden drop percentage elevated risk", "autocorrelation drop", "peer correlation divergence"] },
+      { consumer_id: "C100201", transformer_id: "T004", risk_score: 0.850, supervised_prob: 0.92, anomaly_score: 0.72, reasons: ["longest zero streak elevated risk", "usage volatility elevated risk", "peer zscore divergence"] },
+      { consumer_id: "C100390", transformer_id: "T019", risk_score: 0.820, supervised_prob: 0.88, anomaly_score: 0.71, reasons: ["relative volatility elevated risk", "autocorrelation drop", "trend slope drop"] },
+      { consumer_id: "C100145", transformer_id: "T007", risk_score: 0.790, supervised_prob: 0.85, anomaly_score: 0.68, reasons: ["sudden drop count elevated risk", "zero streak length elevated risk", "usage volatility"] }
+    ];
+
+    function initPage() {
+      // Populate suspect table
+      const tbody = document.getElementById("suspects-tbody");
+      const select = document.getElementById("select-consumer");
+      tbody.innerHTML = "";
+      select.innerHTML = "";
+
+      sampleData.forEach((row, i) => {
+        const tr = document.createElement("tr");
+        tr.className = i % 2 === 0 ? "bg-slate-900/40" : "bg-slate-900/10";
+        tr.innerHTML = `
+          <td class="p-3 font-semibold text-cyan-400">${row.consumer_id}</td>
+          <td class="p-3">${row.transformer_id}</td>
+          <td class="p-3 font-bold text-red-400">${(row.risk_score * 100).toFixed(1)}%</td>
+          <td class="p-3">${(row.supervised_prob * 100).toFixed(1)}%</td>
+          <td class="p-3">${(row.anomaly_score * 100).toFixed(1)}%</td>
+        `;
+        tbody.appendChild(tr);
+
+        const opt = document.createElement("option");
+        opt.value = row.consumer_id;
+        opt.innerText = `${row.consumer_id} (${(row.risk_score * 100).toFixed(1)}% Risk)`;
+        select.appendChild(opt);
+      });
+
+      renderTransformerChart();
+      renderScatterChart();
+      renderHistogramChart();
+      onConsumerSelect(sampleData[0].consumer_id);
+    }
+
+    function renderTransformerChart() {
+      const counts = {};
+      sampleData.forEach(d => { counts[d.transformer_id] = (counts[d.transformer_id] || 0) + 1; });
+      const x = Object.keys(counts);
+      const y = Object.values(counts);
+
+      Plotly.newPlot("chart-transformer", [{
+        x: x, y: y, type: "bar",
+        marker: { color: y, colorscale: "Reds" }
+      }], {
+        margin: { l: 30, r: 10, t: 10, b: 30 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        font: { color: "#94A3B8" }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function renderScatterChart() {
+      Plotly.newPlot("chart-scatter", [{
+        x: sampleData.map(d => d.supervised_prob),
+        y: sampleData.map(d => d.anomaly_score),
+        mode: "markers",
+        marker: {
+          size: sampleData.map(d => d.risk_score * 20 + 8),
+          color: sampleData.map(d => d.risk_score),
+          colorscale: "Viridis"
+        },
+        text: sampleData.map(d => `${d.consumer_id} (${d.transformer_id})`)
+      }], {
+        margin: { l: 40, r: 10, t: 10, b: 40 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis: { title: "Supervised ML Prob", gridcolor: "#334155" },
+        yaxis: { title: "Anomaly Score", gridcolor: "#334155" },
+        font: { color: "#94A3B8" },
+        shapes: [
+          { type: 'line', x0: 0.5, y0: 0, x1: 0.5, y1: 1, line: { color: '#64748B', dash: 'dash' } },
+          { type: 'line', x0: 0, y0: 0.5, x1: 1, y1: 0.5, line: { color: '#64748B', dash: 'dash' } }
+        ]
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function renderHistogramChart() {
+      Plotly.newPlot("chart-histogram", [{
+        x: sampleData.map(d => d.risk_score),
+        type: "histogram",
+        nbinsx: 10,
+        marker: { color: "#06B6D4" }
+      }], {
+        margin: { l: 40, r: 10, t: 10, b: 40 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        xaxis: { title: "Composite Risk Score", gridcolor: "#334155" },
+        yaxis: { title: "Count", gridcolor: "#334155" },
+        font: { color: "#94A3B8" }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function onConsumerSelect(id) {
+      const row = sampleData.find(d => d.consumer_id === id);
+      if (!row) return;
+
+      document.getElementById("insp-id").innerText = `Consumer ID: ${row.consumer_id}`;
+      document.getElementById("insp-trans").innerText = row.transformer_id;
+      document.getElementById("insp-risk").innerText = `${(row.risk_score * 100).toFixed(1)}%`;
+
+      const reasonsContainer = document.getElementById("insp-reasons");
+      reasonsContainer.innerHTML = "";
+      row.reasons.forEach(r => {
+        const div = document.createElement("div");
+        div.className = "bg-slate-900 border border-slate-800 p-2 text-xs rounded text-slate-300";
+        div.innerText = r;
+        reasonsContainer.appendChild(div);
+      });
+
+      Plotly.newPlot("chart-component", [{
+        x: ["Supervised ML Prob", "Unsupervised Anomaly Score", "Composite Risk Score"],
+        y: [row.supervised_prob, row.anomaly_score, row.risk_score],
+        type: "bar",
+        marker: { color: ["#3B82F6", "#10B981", "#F59E0B"] }
+      }], {
+        margin: { l: 40, r: 10, t: 20, b: 40 },
+        paper_bgcolor: "rgba(0,0,0,0)",
+        plot_bgcolor: "rgba(0,0,0,0)",
+        yaxis: { range: [0, 1.05], tickformat: ".0%", gridcolor: "#334155" },
+        font: { color: "#94A3B8" }
+      }, { responsive: true, displayModeBar: false });
+    }
+
+    function switchTab(tabId) {
+      ["tab-threats", "tab-analytics", "tab-inspector"].forEach(id => {
+        document.getElementById(id).classList.add("hidden");
+      });
+      document.getElementById(tabId).classList.remove("hidden");
+
+      ["btn-threats", "btn-analytics", "btn-inspector"].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.classList.remove("border-cyan-400", "text-cyan-400");
+        btn.classList.add("border-transparent", "text-slate-400");
+      });
+
+      const activeBtnMap = { "tab-threats": "btn-threats", "tab-analytics": "btn-analytics", "tab-inspector": "btn-inspector" };
+      const activeBtn = document.getElementById(activeBtnMap[tabId]);
+      activeBtn.classList.remove("border-transparent", "text-slate-400");
+      activeBtn.classList.add("border-cyan-400", "text-cyan-400");
+
+      window.dispatchEvent(new Event("resize"));
+    }
+
+    function downloadReport() {
+      const select = document.getElementById("select-consumer");
+      const id = select.value;
+      const row = sampleData.find(d => d.consumer_id === id);
+      const text = `SMART GRID ELECTRICITY THEFT INSPECTION REPORT\nTarget Consumer: ${row.consumer_id}\nTransformer Zone: ${row.transformer_id}\nRisk Score: ${(row.risk_score * 100).toFixed(1)}%\nReasons:\n${row.reasons.map(r => '- ' + r).join('\n')}`;
+      
+      const blob = new Blob([text], { type: "text/plain" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = `inspection_report_${id}.txt`;
+      a.click();
+    }
+
+    window.onload = initPage;
+  </script>
+</body>
+</html>
